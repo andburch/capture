@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Send to Obsidian</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0f0f11;
+    --surface: #18181c;
+    --surface2: #222228;
+    --border: rgba(255,255,255,0.08);
+    --border-hover: rgba(255,255,255,0.15);
+    --text: #e8e8f0;
+    --muted: #888899;
+    --accent: #7c6ef5;
+    --accent-hover: #9585f8;
+    --accent-dim: rgba(124,110,245,0.12);
+    --success: #3ecf8e;
+    --error: #f87171;
+    --radius: 10px;
+    --radius-sm: 6px;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    font-size: 15px;
+    line-height: 1.5;
+    min-height: 100dvh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 2rem;
+    width: 100%;
+    max-width: 520px;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 1.75rem;
+  }
+
+  .logo-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .logo-icon svg {
+    width: 18px;
+    height: 18px;
+    fill: white;
+  }
+
+  .logo-text {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text);
+    letter-spacing: -0.01em;
+  }
+
+  .logo-sub {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 1px;
+  }
+
+  label {
+    display: block;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--muted);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+
+  input[type="text"],
+  input[type="password"],
+  textarea {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 14px;
+    padding: 9px 12px;
+    outline: none;
+    transition: border-color 0.15s;
+    -webkit-appearance: none;
+  }
+
+  input[type="text"]:focus,
+  input[type="password"]:focus,
+  textarea:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-dim);
+  }
+
+  textarea {
+    resize: vertical;
+    min-height: 140px;
+    line-height: 1.6;
+  }
+
+  .field { margin-bottom: 1.1rem; }
+
+  .row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+    margin-bottom: 1.1rem;
+  }
+
+  .tags-hint {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+
+  .bottom {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 1.25rem;
+    gap: 1rem;
+  }
+
+  .status {
+    font-size: 13px;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 20px;
+  }
+
+  .status.success { color: var(--success); }
+  .status.error { color: var(--error); }
+
+  .status-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: currentColor;
+    flex-shrink: 0;
+  }
+
+  button {
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: var(--radius-sm);
+    padding: 9px 22px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s, opacity 0.15s;
+    flex-shrink: 0;
+    letter-spacing: -0.01em;
+  }
+
+  button:hover { background: var(--accent-hover); }
+  button:active { opacity: 0.85; }
+  button:disabled { opacity: 0.45; cursor: default; }
+
+  .divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 1.5rem 0;
+  }
+
+  /* Lock screen */
+  #lock-screen { display: flex; flex-direction: column; }
+  #main-screen { display: none; flex-direction: column; }
+
+  .lock-title {
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 0.25rem;
+    letter-spacing: -0.02em;
+  }
+
+  .lock-sub {
+    font-size: 13px;
+    color: var(--muted);
+    margin-bottom: 1.5rem;
+  }
+
+  .lock-row {
+    display: flex;
+    gap: 0.75rem;
+  }
+
+  .lock-row input { flex: 1; }
+  .lock-row button { padding: 9px 18px; }
+
+  .lock-error {
+    font-size: 12px;
+    color: var(--error);
+    margin-top: 6px;
+    min-height: 16px;
+  }
+
+  /* Settings panel */
+  .settings-toggle {
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-size: 12px;
+    padding: 0;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    transition: color 0.15s;
+    letter-spacing: 0.02em;
+  }
+
+  .settings-toggle:hover { background: none; color: var(--text); }
+
+  .settings-panel {
+    display: none;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 1rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .settings-panel.open { display: block; }
+
+  .settings-panel label { margin-top: 0.75rem; }
+  .settings-panel label:first-child { margin-top: 0; }
+
+  .settings-panel input { font-size: 13px; font-family: monospace; }
+
+  .settings-note {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 6px;
+    line-height: 1.5;
+  }
+
+  @media (max-width: 480px) {
+    body { padding: 1rem; align-items: flex-start; padding-top: 2rem; }
+    .card { padding: 1.5rem; }
+    .row { grid-template-columns: 1fr; }
+    .bottom { flex-direction: column; align-items: stretch; }
+    button { text-align: center; }
+  }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="logo">
+    <div class="logo-icon">
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 1.5L18.5 9H13V3.5zM6 20V4h5v7h7v9H6z"/>
+      </svg>
+    </div>
+    <div>
+      <div class="logo-text">Send to Obsidian</div>
+      <div class="logo-sub">Drops straight into your vault</div>
+    </div>
+  </div>
+
+  <!-- Lock screen -->
+  <div id="lock-screen">
+    <div class="lock-title">Enter password</div>
+    <div class="lock-sub">This page is password protected.</div>
+    <div class="lock-row">
+      <input type="password" id="password-input" placeholder="Password" autocomplete="current-password" />
+      <button onclick="unlock()">Unlock</button>
+    </div>
+    <div class="lock-error" id="lock-error"></div>
+  </div>
+
+  <!-- Main screen -->
+  <div id="main-screen">
+    <div class="field">
+      <label>Title</label>
+      <input type="text" id="title" placeholder="Leave blank to use timestamp" autocomplete="off" />
+    </div>
+
+    <div class="field">
+      <label>Note</label>
+      <textarea id="content" placeholder="What's on your mind?"></textarea>
+    </div>
+
+    <div class="row">
+      <div>
+        <label>Folder</label>
+        <input type="text" id="folder" placeholder="inbox" autocomplete="off" />
+      </div>
+      <div>
+        <label>Tags</label>
+        <input type="text" id="tags" placeholder="idea, work" autocomplete="off" />
+        <div class="tags-hint">comma separated</div>
+      </div>
+    </div>
+
+    <div style="margin-bottom: 1rem;">
+      <button class="settings-toggle" onclick="toggleSettings()" type="button">
+        <span id="settings-arrow">▸</span> Webhook settings
+      </button>
+    </div>
+
+    <div class="settings-panel" id="settings-panel">
+      <label>Webhook URL</label>
+      <input type="text" id="webhook-url" placeholder="https://obsidian-webhooks.khabaroff.studio/webhook/wh_..." autocomplete="off" spellcheck="false" />
+      <div class="settings-note">Your full webhook URL from khabaroff.studio. Saved in your browser — you only need to enter this once.</div>
+    </div>
+
+    <hr class="divider" style="margin-top: 0;" />
+
+    <div class="bottom">
+      <div class="status" id="status"></div>
+      <button id="send-btn" onclick="sendNote()">Send note →</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ── CONFIG ──────────────────────────────────────────────────────────────────
+  // Change this to your own password before deploying.
+  const PASSWORD = "changeme";
+  // ────────────────────────────────────────────────────────────────────────────
+
+  const SESSION_KEY = "obsidian_capture_auth";
+  const WEBHOOK_STORAGE_KEY = "obsidian_webhook_url";
+
+  function unlock() {
+    const val = document.getElementById("password-input").value;
+    const err = document.getElementById("lock-error");
+    if (val === PASSWORD) {
+      sessionStorage.setItem(SESSION_KEY, "1");
+      showMain();
+    } else {
+      err.textContent = "Incorrect password.";
+      document.getElementById("password-input").value = "";
+      document.getElementById("password-input").focus();
+    }
+  }
+
+  document.getElementById("password-input").addEventListener("keydown", e => {
+    if (e.key === "Enter") unlock();
+  });
+
+  function showMain() {
+    document.getElementById("lock-screen").style.display = "none";
+    const main = document.getElementById("main-screen");
+    main.style.display = "flex";
+    // Restore saved webhook URL
+    const saved = localStorage.getItem(WEBHOOK_STORAGE_KEY);
+    if (saved) document.getElementById("webhook-url").value = saved;
+    document.getElementById("content").focus();
+  }
+
+  // Check if already authenticated this session
+  if (sessionStorage.getItem(SESSION_KEY) === "1") {
+    showMain();
+  }
+
+  function toggleSettings() {
+    const panel = document.getElementById("settings-panel");
+    const arrow = document.getElementById("settings-arrow");
+    const open = panel.classList.toggle("open");
+    arrow.textContent = open ? "▾" : "▸";
+  }
+
+  function setStatus(msg, type) {
+    const el = document.getElementById("status");
+    el.className = "status " + (type || "");
+    el.innerHTML = msg ? `<span class="status-dot"></span>${msg}` : "";
+  }
+
+  async function sendNote() {
+    const webhookUrl = document.getElementById("webhook-url").value.trim();
+    if (!webhookUrl) {
+      setStatus("Add your webhook URL in settings.", "error");
+      document.getElementById("settings-panel").classList.add("open");
+      document.getElementById("settings-arrow").textContent = "▾";
+      document.getElementById("webhook-url").focus();
+      return;
+    }
+
+    const content = document.getElementById("content").value.trim();
+    if (!content) {
+      setStatus("Note can't be empty.", "error");
+      document.getElementById("content").focus();
+      return;
+    }
+
+    // Save webhook URL for next time
+    localStorage.setItem(WEBHOOK_STORAGE_KEY, webhookUrl);
+
+    const rawTitle = document.getElementById("title").value.trim();
+    const rawFolder = document.getElementById("folder").value.trim();
+    const rawTags = document.getElementById("tags").value.trim();
+
+    const now = new Date();
+    const pad = n => String(n).padStart(2, "0");
+    const timestamp = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())} ${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+    const title = rawTitle || timestamp;
+    const folder = (rawFolder || "inbox").replace(/\/$/, "");
+    const filename = title.replace(/[^a-zA-Z0-9 _\-]/g, "").trim().replace(/ +/g, "-") || timestamp.replace(/[ :]/g, "-");
+    const path = `${folder}/${filename}.md`;
+
+    const tags = rawTags
+      ? rawTags.split(",").map(t => t.trim()).filter(Boolean)
+      : [];
+
+    const body = { title, content, ...(tags.length ? { tags } : {}) };
+
+    const btn = document.getElementById("send-btn");
+    btn.disabled = true;
+    setStatus("Sending…");
+
+    try {
+      // NOTE: the khabaroff relay sends no CORS headers, so an application/json
+      // POST triggers a preflight it rejects (403). text/plain is a "simple
+      // request" (no preflight), and no-cors lets the browser send it. The relay
+      // stores the JSON body and the Obsidian plugin parses it into a note.
+      await fetch(`${webhookUrl}?path=${encodeURIComponent(path)}`, {
+        method: "POST",
+        mode: "no-cors",
+        headers: { "Content-Type": "text/plain" },
+        body: JSON.stringify(body)
+      });
+
+      // no-cors responses are opaque (status unreadable). Getting here = it sent.
+      // (A bad webhook URL can't be detected this way — the note just won't appear.)
+      setStatus(`Sent → ${path}`, "success");
+      document.getElementById("title").value = "";
+      document.getElementById("content").value = "";
+      document.getElementById("tags").value = "";
+      document.getElementById("content").focus();
+    } catch (err) {
+      setStatus("Could not reach the relay — check your connection / webhook URL.", "error");
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  document.addEventListener("keydown", e => {
+    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+      if (document.getElementById("main-screen").style.display !== "none") {
+        sendNote();
+      }
+    }
+  });
+</script>
+</body>
+</html>
