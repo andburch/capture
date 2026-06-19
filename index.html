@@ -323,14 +323,14 @@
 
     <div style="margin-bottom: 1rem;">
       <button class="settings-toggle" onclick="toggleSettings()" type="button">
-        <span id="settings-arrow">▸</span> Webhook settings
+        <span id="settings-arrow">▸</span> Topic settings
       </button>
     </div>
 
     <div class="settings-panel" id="settings-panel">
-      <label>Webhook URL</label>
-      <input type="text" id="webhook-url" placeholder="https://obsidian-webhooks.khabaroff.studio/webhook/wh_..." autocomplete="off" spellcheck="false" />
-      <div class="settings-note">Your full webhook URL from khabaroff.studio. Saved in your browser — you only need to enter this once.</div>
+      <label>ntfy topic</label>
+      <input type="text" id="ntfy-topic" placeholder="obs-xxxxxxxx" autocomplete="off" spellcheck="false" />
+      <div class="settings-note">Your private ntfy topic (the long <code>obs-…</code> string). Saved in this browser only — you enter it once. Anyone who knows it can post to your vault, so keep it private.</div>
     </div>
 
     <hr class="divider" style="margin-top: 0;" />
@@ -346,10 +346,12 @@
   // ── CONFIG ──────────────────────────────────────────────────────────────────
   // Change this to your own password before deploying.
   const PASSWORD = "changeme";
+  // ntfy server. Public free instance by default.
+  const NTFY_BASE = "https://ntfy.sh";
   // ────────────────────────────────────────────────────────────────────────────
 
   const SESSION_KEY = "obsidian_capture_auth";
-  const WEBHOOK_STORAGE_KEY = "obsidian_webhook_url";
+  const TOPIC_STORAGE_KEY = "obsidian_ntfy_topic";
 
   function unlock() {
     const val = document.getElementById("password-input").value;
@@ -372,9 +374,9 @@
     document.getElementById("lock-screen").style.display = "none";
     const main = document.getElementById("main-screen");
     main.style.display = "flex";
-    // Restore saved webhook URL
-    const saved = localStorage.getItem(WEBHOOK_STORAGE_KEY);
-    if (saved) document.getElementById("webhook-url").value = saved;
+    // Restore saved topic
+    const saved = localStorage.getItem(TOPIC_STORAGE_KEY);
+    if (saved) document.getElementById("ntfy-topic").value = saved;
     document.getElementById("content").focus();
   }
 
@@ -397,12 +399,12 @@
   }
 
   async function sendNote() {
-    const webhookUrl = document.getElementById("webhook-url").value.trim();
-    if (!webhookUrl) {
-      setStatus("Add your webhook URL in settings.", "error");
+    const topic = document.getElementById("ntfy-topic").value.trim();
+    if (!topic) {
+      setStatus("Add your ntfy topic in settings.", "error");
       document.getElementById("settings-panel").classList.add("open");
       document.getElementById("settings-arrow").textContent = "▾";
-      document.getElementById("webhook-url").focus();
+      document.getElementById("ntfy-topic").focus();
       return;
     }
 
@@ -413,52 +415,49 @@
       return;
     }
 
-    // Save webhook URL for next time
-    localStorage.setItem(WEBHOOK_STORAGE_KEY, webhookUrl);
+    // Save topic for next time
+    localStorage.setItem(TOPIC_STORAGE_KEY, topic);
 
-    const rawTitle = document.getElementById("title").value.trim();
-    const rawFolder = document.getElementById("folder").value.trim();
+    const title = document.getElementById("title").value.trim();
+    const folder = document.getElementById("folder").value.trim().replace(/\/$/, "");
     const rawTags = document.getElementById("tags").value.trim();
-
-    const now = new Date();
-    const pad = n => String(n).padStart(2, "0");
-    const timestamp = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())} ${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
-    const title = rawTitle || timestamp;
-    const folder = (rawFolder || "inbox").replace(/\/$/, "");
-    const filename = title.replace(/[^a-zA-Z0-9 _\-]/g, "").trim().replace(/ +/g, "-") || timestamp.replace(/[ :]/g, "-");
-    const path = `${folder}/${filename}.md`;
-
     const tags = rawTags
       ? rawTags.split(",").map(t => t.trim()).filter(Boolean)
       : [];
 
-    const body = { title, content, ...(tags.length ? { tags } : {}) };
+    // The poller parses this JSON body into a note with frontmatter.
+    const body = {
+      title,
+      content,
+      ...(folder ? { folder } : {}),
+      ...(tags.length ? { tags } : {})
+    };
 
     const btn = document.getElementById("send-btn");
     btn.disabled = true;
     setStatus("Sending…");
 
     try {
-      // NOTE: the khabaroff relay sends no CORS headers, so an application/json
-      // POST triggers a preflight it rejects (403). text/plain is a "simple
-      // request" (no preflight), and no-cors lets the browser send it. The relay
-      // stores the JSON body and the Obsidian plugin parses it into a note.
-      await fetch(`${webhookUrl}?path=${encodeURIComponent(path)}`, {
+      // ntfy sends Access-Control-Allow-Origin: * and text/plain is a CORS-safe
+      // content type (no preflight), so this is a real readable request — unlike
+      // the old khabaroff relay which 403'd any browser Origin.
+      const res = await fetch(`${NTFY_BASE}/${encodeURIComponent(topic)}`, {
         method: "POST",
-        mode: "no-cors",
         headers: { "Content-Type": "text/plain" },
         body: JSON.stringify(body)
       });
 
-      // no-cors responses are opaque (status unreadable). Getting here = it sent.
-      // (A bad webhook URL can't be detected this way — the note just won't appear.)
-      setStatus(`Sent → ${path}`, "success");
-      document.getElementById("title").value = "";
-      document.getElementById("content").value = "";
-      document.getElementById("tags").value = "";
-      document.getElementById("content").focus();
+      if (res.ok) {
+        setStatus(`Sent → ${folder || "inbox"}`, "success");
+        document.getElementById("title").value = "";
+        document.getElementById("content").value = "";
+        document.getElementById("tags").value = "";
+        document.getElementById("content").focus();
+      } else {
+        setStatus(`ntfy error ${res.status} — check the topic.`, "error");
+      }
     } catch (err) {
-      setStatus("Could not reach the relay — check your connection / webhook URL.", "error");
+      setStatus("Could not reach ntfy.sh — it may be blocked on this network.", "error");
     } finally {
       btn.disabled = false;
     }
